@@ -53,6 +53,13 @@
             handle_class: 'gs-resize-handle',
             max_size: [Infinity, Infinity],
             min_size: [1, 1]
+        },
+        remove: {
+            enabled: false,
+            handle_append_to: '',
+            handle_class: 'gs-remove-handle',
+            silent: false,
+            on_complete: undefined,
         }
     };
 
@@ -127,6 +134,18 @@
     *        during the resizing.
     *       @param {Function} [options.resize.stop] Function executed
     *        when resizing stops.
+    *    @param {Object} [options.remove] An Object with remove config options.
+    *       @param {Boolean} [options.remove.enabled] Set to true to enable
+    *        the remove handle.
+    *       @param {String} [options.remove.handle_append_to] Set a valid CSS
+    *        selector to append remove handles to.
+    *       @param {String} [options.remove.handle_class] CSS class name used
+    *        by remove handles.
+    *       @param {Boolean|Function} [options.remove.handle_class] If true, 
+    *        widgets below the removed one will not move up. If a Function is 
+    *        passed it will be used as callback.
+    *       @param {Function} [options.remove.on_complete] Function executed 
+    *        when the widget is removed.
     *
     * @constructor
     */
@@ -143,7 +162,7 @@
           this.options.widget_base_dimensions[0];
         this.min_widget_height = (this.options.widget_margins[1] * 2) +
           this.options.widget_base_dimensions[1];
-
+        this.remove_enabled = true;
         this.generated_stylesheets = [];
         this.$style_tags = $([]);
 
@@ -245,6 +264,7 @@
 
     fn.init = function() {
         this.options.resize.enabled && this.setup_resize();
+        this.options.remove.enabled && this.setup_remove();
         this.generate_grid_and_stylesheet();
         this.get_widgets_from_DOM();
         this.set_dom_grid_height();
@@ -252,6 +272,7 @@
         this.$wrapper.addClass('ready');
         this.draggable();
         this.options.resize.enabled && this.resizable();
+        this.options.remove.enabled && this.removable();
 
         $(window).bind('resize.gridster', throttle(
             $.proxy(this.recalculate_faux_grid, this), 200));
@@ -306,6 +327,31 @@
     fn.enable_resize = function() {
         this.$el.removeClass('gs-resize-disabled');
         this.resize_api.enable();
+        return this;
+    };
+
+    /**
+    * Disables widget removal.
+    *
+    * @method disable
+    * @return {Class} Returns instance of gridster Class.
+    */
+    fn.disable_remove = function() {
+        this.$el.addClass('gs-remove-disabled');
+        this.remove_enabled = false;
+        return this;
+    };
+
+
+    /**
+    * Enables widget removal.
+    *
+    * @method enable
+    * @return {Class} Returns instance of gridster Class.
+    */
+    fn.enable_remove = function() {
+        this.$el.removeClass('gs-remove-disabled');
+        this.remove_enabled = true;
         return this;
     };
 
@@ -430,7 +476,22 @@
     */
     fn.add_resize_handle = function($w) {
         var append_to = this.options.resize.handle_append_to;
-        $(this.resize_handle_tpl).appendTo( append_to ? $(append_to, $w) : $w);
+        $(this.resize_handle_tpl).appendTo( append_to ? $(append_to, $widget) : $widget);
+
+        return this;
+    };
+
+    /**
+    * Append the remove handle into a widget.
+    *
+    * @method add_remove_handle
+    * @param {HTMLElement} $widget The jQuery wrapped HTMLElement
+    *  representing the widget.
+    * @return {HTMLElement} Returns instance of gridster Class.
+    */
+    fn.add_remove_handle = function($widget) {
+        var append_to = this.options.remove.handle_append_to;
+        $(this.remove_handle_tpl).appendTo( append_to ? $(append_to, $widget) : $widget);
 
         return this;
     };
@@ -871,6 +932,7 @@
         this.add_to_gridmap(wgd, $el);
 
         this.options.resize.enabled && this.add_resize_handle($el);
+        this.options.remove.enabled && this.add_remove_handle($el);
 
         return !! empty_upper_row;
     };
@@ -999,6 +1061,24 @@
         return this;
     };
 
+    /**
+    * Bind remove events to the remove handles.
+    *
+    * @method removable
+    * @return {Class} Return instance of gridster Class.
+    */
+    fn.removable = function() {
+        ui = this;
+        this.$el.find('li .' + this.remove_handle_class).click(function(event) {
+            if (ui.remove_enabled) {
+                $player = $(event.target).closest('.gs-w');
+                ui.remove_widget($player, ui.options.remove.silent, ui.options.remove.on_complete);
+            }
+        });
+
+        return this;
+    };
+
 
     /**
     * Setup things required for resizing. Like build templates for drag handles.
@@ -1021,6 +1101,19 @@
                 '.' + this.resize_handle_class);
         }
 
+        return this;
+    };
+
+
+    /**
+    * Setup things required for removing. Like build template for remove handles.
+    *
+    * @method setup_remove
+    * @return {class} Returns instance of gridster Class.
+    */
+    fn.setup_remove = function() {
+        this.remove_handle_class = this.options.remove.handle_class;
+        this.remove_handle_tpl = '<span class="' + this.remove_handle_class + '" />';
         return this;
     };
 
